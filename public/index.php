@@ -1,5 +1,15 @@
 <?php
 
+// ========== 一键安装检测 ==========
+$lockFile = __DIR__ . '/../storage/install.lock';
+// 注意：install.php 和 index.php 在同一目录（public）
+if (!file_exists($lockFile) && strpos($_SERVER['REQUEST_URI'], '/install.php') === false) {
+    header('Location: /install.php');
+    exit;
+}
+// ========== 一键安装检测结束 ==========
+
+
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 

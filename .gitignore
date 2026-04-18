@@ -4,6 +4,7 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/install.lock
 /storage/pail
 /vendor
 .env
