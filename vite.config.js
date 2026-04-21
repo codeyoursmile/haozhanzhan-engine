@@ -8,10 +8,15 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
-                'resources/js/admin/main.js',
+                'resources/js/admin/main.ts',
             ],
             refresh: true,
         }),
-        vue(),
+        vue({
+            script: {
+                defineModel: true,
+                propsDestructure: true,
+            },
+        }),
     ],
 });

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>好站站后台管理</title>
-    @vite('resources/js/admin/main.js')
+    @vite('resources/js/admin/main.ts')
 </head>
 <body>
     <div id="app"></div>
