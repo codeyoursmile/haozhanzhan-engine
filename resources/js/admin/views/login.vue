@@ -47,19 +47,17 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { User, Lock } from '@element-plus/icons-vue';
+import { useAuthStore } from '../stores/auth';
 
-// 定义表单数据类型
-interface LoginForm {
-    email: string;
-    password: string;
-}
-
+const router = useRouter();
+const authStore = useAuthStore();
 const formRef = ref();
-const loading = ref<boolean>(false);
+const loading = ref(false);
 
-const form = reactive<LoginForm>({
+const form = reactive({
     email: '',
     password: '',
 });
@@ -75,18 +73,22 @@ const rules = {
     ],
 };
 
-const handleLogin = () => {
+const handleLogin = async () => {
     if (!formRef.value) return;
 
-    formRef.value.validate(async (valid: boolean) => {
+    await formRef.value.validate(async (valid: boolean) => {
         if (!valid) return;
 
         loading.value = true;
-        
-        setTimeout(() => {
-            loading.value = false;
-            ElMessage.warning('后端API开发中，暂不支持登录');
-        }, 500);
+        const success = await authStore.login(form.email, form.password);
+        loading.value = false;
+
+        if (success) {
+            ElMessage.success('登录成功');
+            router.push('/admin');
+        } else {
+            ElMessage.error('邮箱或密码错误');
+        }
     });
 };
 </script>
