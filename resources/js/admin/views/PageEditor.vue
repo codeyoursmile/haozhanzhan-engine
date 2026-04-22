@@ -18,7 +18,12 @@
 
         <!-- 中间：画布 -->
         <div class="editor-canvas">
-            <div class="canvas-title">页面画布</div>
+            <div class="canvas-title">
+                <span>页面画布</span>
+                <el-button type="primary" size="small" @click="savePage" :loading="savingPage">
+                    保存页面
+                </el-button>
+            </div>
             <div
                 ref="canvasRef"
                 class="canvas-content"
@@ -87,6 +92,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { ElMessage } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useComponentStore } from '../stores/component';
 import type { ComponentType } from '../types/components';
@@ -107,7 +113,7 @@ const componentLibrary = ref([
     { type: 'contact_form' as ComponentType, name: '联系表单' },
 ]);
 
-// ========== 选中状态和表单变量 ==========
+// 选中状态和表单变量
 const selectedComponent = ref<any>(null);
 const selectedId = ref<number | null>(null);
 const editForm = ref({
@@ -118,16 +124,15 @@ const editForm = ref({
     link_url: '',
 });
 const saving = ref(false);
-// ========== 结束 ==========
+const savingPage = ref(false);
 
-// ========== 选中组件 ==========
+// 选中组件
 const selectComponent = (comp: any) => {
     selectedComponent.value = comp;
     selectedId.value = comp.id;
 };
-// ========== 结束 ==========
 
-// ========== 监听选中组件变化，自动填充表单 ==========
+// 监听选中组件变化，自动填充表单
 watch(selectedComponent, (newVal) => {
     if (newVal && newVal.content) {
         editForm.value = {
@@ -147,9 +152,8 @@ watch(selectedComponent, (newVal) => {
         };
     }
 }, { immediate: true });
-// ========== 结束 ==========
 
-// ========== 保存组件属性 ==========
+// 保存组件属性
 const saveComponent = async () => {
     if (!selectedComponent.value) return;
     saving.value = true;
@@ -164,11 +168,26 @@ const saveComponent = async () => {
             },
         });
         selectedComponent.value.content = { ...editForm.value };
+        ElMessage.success('组件保存成功');
+    } catch (error) {
+        ElMessage.error('组件保存失败');
     } finally {
         saving.value = false;
     }
 };
-// ========== 结束 ==========
+
+// 保存页面
+const savePage = async () => {
+    savingPage.value = true;
+    try {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        ElMessage.success('页面保存成功');
+    } catch (error) {
+        ElMessage.error('页面保存失败');
+    } finally {
+        savingPage.value = false;
+    }
+};
 
 // 拖拽开始
 const onDragStart = (evt: DragEvent, component: { type: ComponentType; name: string }) => {
@@ -283,6 +302,12 @@ onMounted(async () => {
     background: #fafafa;
 }
 
+.canvas-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .component-list {
     padding: 16px;
     display: flex;
@@ -321,7 +346,6 @@ onMounted(async () => {
     transition: all 0.2s;
 }
 
-/* 选中组件的高亮样式 */
 .canvas-component.selected {
     border: 2px solid #1890ff;
     box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
