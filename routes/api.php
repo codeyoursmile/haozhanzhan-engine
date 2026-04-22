@@ -24,5 +24,12 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/site', [SiteController::class, 'index']);
     Route::put('/site', [SiteController::class, 'update']);
 
+    // 组件管理
+    Route::get('/pages/{pageId}/components', [App\Http\Controllers\Admin\ComponentController::class, 'getByPageId']);
+    Route::post('/components', [App\Http\Controllers\Admin\ComponentController::class, 'store']);
+    Route::put('/components/{id}', [App\Http\Controllers\Admin\ComponentController::class, 'update']);
+    Route::delete('/components/{id}', [App\Http\Controllers\Admin\ComponentController::class, 'destroy']);
+    Route::post('/components/sort', [App\Http\Controllers\Admin\ComponentController::class, 'updateSortOrder']);
+
     
 });
