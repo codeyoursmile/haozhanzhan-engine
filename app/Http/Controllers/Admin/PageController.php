@@ -14,6 +14,9 @@ class PageController extends Controller
         return response()->json($pages);
     }
 
+    
+
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -23,7 +26,19 @@ class PageController extends Controller
             'status' => 'boolean',
         ]);
 
-        $page = Page::create($validated);
+        // 获取第一个站点的 ID（因为当前系统只有一个站点）
+        $site = \App\Models\Site::first();
+        if (!$site) {
+            // 如果没有站点，创建一个默认站点
+            $site = \App\Models\Site::create([
+                'site_name' => '好站站企业官网',
+                'site_logo' => '/logo.png',
+            ]);
+        }
+        
+        $validated['site_id'] = $site->id;
+        $page = \App\Models\Page::create($validated);
+        
         return response()->json($page, 201);
     }
 
