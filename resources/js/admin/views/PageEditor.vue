@@ -29,11 +29,13 @@
                     v-for="comp in componentStore.components"
                     :key="comp.id"
                     class="canvas-component"
+                    :class="{ 'selected': selectedId === comp.id }"
                     :data-id="comp.id"
+                    @click="selectComponent(comp)"
                 >
                     <div class="component-header">
                         <span>{{ getComponentName(comp.component_type) }}</span>
-                        <el-button type="danger" link size="small" @click="componentStore.deleteComponent(comp.id)">
+                        <el-button type="danger" link size="small" @click.stop="componentStore.deleteComponent(comp.id)">
                             删除
                         </el-button>
                     </div>
@@ -51,14 +53,39 @@
         <div class="editor-property">
             <div class="property-title">属性面板</div>
             <div class="property-content">
-                <p class="empty-tip">点击组件编辑属性</p>
+                <div v-if="selectedComponent">
+                    <el-form label-width="80px" :model="editForm">
+                        <el-form-item label="组件类型">
+                            <span>{{ getComponentName(selectedComponent.component_type) }}</span>
+                        </el-form-item>
+                        <el-form-item label="标题">
+                            <el-input v-model="editForm.title" placeholder="请输入标题" />
+                        </el-form-item>
+                        <el-form-item label="副标题" v-if="selectedComponent.component_type === 'banner'">
+                            <el-input v-model="editForm.subtitle" placeholder="请输入副标题" />
+                        </el-form-item>
+                        <el-form-item label="内容" v-if="selectedComponent.component_type === 'text'">
+                            <el-input type="textarea" v-model="editForm.text" rows="4" placeholder="请输入内容" />
+                        </el-form-item>
+                        <el-form-item label="图片地址" v-if="['banner', 'image'].includes(selectedComponent.component_type)">
+                            <el-input v-model="editForm.image_url" placeholder="例如: /images/banner.jpg" />
+                        </el-form-item>
+                        <el-form-item label="链接地址" v-if="['banner', 'image'].includes(selectedComponent.component_type)">
+                            <el-input v-model="editForm.link_url" placeholder="例如: /about" />
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="primary" @click="saveComponent" :loading="saving">保存</el-button>
+                        </el-form-item>
+                    </el-form>
+                </div>
+                <p v-else class="empty-tip">点击组件编辑属性</p>
             </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Sortable from 'sortablejs';
 import { useComponentStore } from '../stores/component';
@@ -79,6 +106,69 @@ const componentLibrary = ref([
     { type: 'map' as ComponentType, name: '地图' },
     { type: 'contact_form' as ComponentType, name: '联系表单' },
 ]);
+
+// ========== 选中状态和表单变量 ==========
+const selectedComponent = ref<any>(null);
+const selectedId = ref<number | null>(null);
+const editForm = ref({
+    title: '',
+    subtitle: '',
+    text: '',
+    image_url: '',
+    link_url: '',
+});
+const saving = ref(false);
+// ========== 结束 ==========
+
+// ========== 选中组件 ==========
+const selectComponent = (comp: any) => {
+    selectedComponent.value = comp;
+    selectedId.value = comp.id;
+};
+// ========== 结束 ==========
+
+// ========== 监听选中组件变化，自动填充表单 ==========
+watch(selectedComponent, (newVal) => {
+    if (newVal && newVal.content) {
+        editForm.value = {
+            title: newVal.content.title || '',
+            subtitle: newVal.content.subtitle || '',
+            text: newVal.content.text || '',
+            image_url: newVal.content.image_url || '',
+            link_url: newVal.content.link_url || '',
+        };
+    } else {
+        editForm.value = {
+            title: '',
+            subtitle: '',
+            text: '',
+            image_url: '',
+            link_url: '',
+        };
+    }
+}, { immediate: true });
+// ========== 结束 ==========
+
+// ========== 保存组件属性 ==========
+const saveComponent = async () => {
+    if (!selectedComponent.value) return;
+    saving.value = true;
+    try {
+        await componentStore.updateComponent(selectedComponent.value.id, {
+            content: {
+                title: editForm.value.title,
+                subtitle: editForm.value.subtitle,
+                text: editForm.value.text,
+                image_url: editForm.value.image_url,
+                link_url: editForm.value.link_url,
+            },
+        });
+        selectedComponent.value.content = { ...editForm.value };
+    } finally {
+        saving.value = false;
+    }
+};
+// ========== 结束 ==========
 
 // 拖拽开始
 const onDragStart = (evt: DragEvent, component: { type: ComponentType; name: string }) => {
@@ -117,7 +207,6 @@ const initSortable = () => {
         animation: 150,
         handle: '.canvas-component',
         onEnd: async () => {
-            // 获取排序后的组件顺序
             const items = canvasRef.value?.querySelectorAll('.canvas-component');
             if (!items) return;
             
@@ -129,14 +218,6 @@ const initSortable = () => {
             await componentStore.updateSortOrder(sortedItems);
         },
     });
-};
-
-// 销毁排序实例
-const destroySortable = () => {
-    if (sortableInstance) {
-        sortableInstance.destroy();
-        sortableInstance = null;
-    }
 };
 
 // 获取组件显示名称
@@ -237,6 +318,13 @@ onMounted(async () => {
     margin-bottom: 12px;
     overflow: hidden;
     cursor: grab;
+    transition: all 0.2s;
+}
+
+/* 选中组件的高亮样式 */
+.canvas-component.selected {
+    border: 2px solid #1890ff;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 }
 
 .component-header {
