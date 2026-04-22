@@ -24,10 +24,16 @@ const routes = [
                 component: () => import('../views/Pages.vue'),
             },
             {
+                path: 'pages/:id/edit',
+                name: 'page-editor',
+                component: () => import('../views/PageEditor.vue'),
+            },
+            {
                 path: 'site',
                 name: 'site-settings',
                 component: () => import('../views/SiteSettings.vue'),
             },
+            
         ],
     },
 ];

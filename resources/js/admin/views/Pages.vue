@@ -85,6 +85,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import { usePageStore } from '../stores/page';
+import { useRouter } from 'vue-router';
 
 const pageStore = usePageStore();
 const dialogVisible = ref(false);
@@ -114,15 +115,9 @@ const handleCreate = () => {
     dialogVisible.value = true;
 };
 
+const router = useRouter();
 const handleEdit = (row: any) => {
-    isEdit.value = true;
-    editId.value = row.id;
-    dialogTitle.value = '编辑页面';
-    form.title = row.title;
-    form.slug = row.slug;
-    form.is_home = Boolean(row.is_home);
-    form.status = Boolean(row.status);
-    dialogVisible.value = true;
+    router.push(`/admin/pages/${row.id}/edit`);
 };
 
 const handleDelete = (row: any) => {
