@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 
 class PageController extends Controller
 {
@@ -68,5 +69,26 @@ class PageController extends Controller
         $page = Page::findOrFail($id);
         $page->delete();
         return response()->json(null, 204);
+    }
+    /**
+     * 一键发布 - 生成静态页面
+     */
+    public function publish()
+    {
+        try {
+            Artisan::call('generate:static');
+            $output = Artisan::output();
+            
+            return response()->json([
+                'success' => true,
+                'message' => '静态页面生成成功',
+                'output' => $output
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '生成失败：' . $e->getMessage()
+            ], 500);
+        }
     }
 }

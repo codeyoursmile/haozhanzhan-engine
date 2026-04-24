@@ -4,10 +4,16 @@
             <template #header>
                 <div class="card-header">
                     <span>页面管理</span>
-                    <el-button type="primary" size="small" @click="handleCreate">
-                        <el-icon><Plus /></el-icon>
-                        新建页面
-                    </el-button>
+                    <div>
+                        <el-button type="success" size="small" @click="handlePublish" :loading="publishing">
+                            <el-icon><Upload /></el-icon>
+                            一键发布
+                        </el-button>
+                        <el-button type="primary" size="small" @click="handleCreate">
+                            <el-icon><Plus /></el-icon>
+                            新建页面
+                        </el-button>
+                    </div>
                 </div>
             </template>
 
@@ -82,18 +88,21 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { ElMessageBox } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Plus, Upload } from '@element-plus/icons-vue';
 import { usePageStore } from '../stores/page';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
 
 const pageStore = usePageStore();
+const router = useRouter();
 const dialogVisible = ref(false);
 const dialogTitle = ref('');
 const submitting = ref(false);
 const formRef = ref();
 const isEdit = ref(false);
 const editId = ref<number | null>(null);
+const publishing = ref(false);
 
 const form = reactive({
     title: '',
@@ -115,7 +124,6 @@ const handleCreate = () => {
     dialogVisible.value = true;
 };
 
-const router = useRouter();
 const handleEdit = (row: any) => {
     router.push(`/admin/pages/${row.id}/edit`);
 };
@@ -162,6 +170,22 @@ const resetForm = () => {
     form.slug = '';
     form.is_home = false;
     form.status = false;
+};
+
+const handlePublish = async () => {
+    publishing.value = true;
+    try {
+        const response = await axios.post('/api/admin/publish');
+        if (response.data.success) {
+            ElMessage.success(response.data.message);
+        } else {
+            ElMessage.error(response.data.message);
+        }
+    } catch (error) {
+        ElMessage.error('发布失败，请检查服务器日志');
+    } finally {
+        publishing.value = false;
+    }
 };
 
 onMounted(() => {
