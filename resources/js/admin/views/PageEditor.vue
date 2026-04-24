@@ -143,6 +143,7 @@ watch(selectedComponent, (newVal) => {
             link_url: newVal.content.link_url || '',
         };
     } else {
+        // 重置表单
         editForm.value = {
             title: '',
             subtitle: '',
@@ -153,7 +154,7 @@ watch(selectedComponent, (newVal) => {
     }
 }, { immediate: true });
 
-// 保存组件属性
+// 保存组件属性（按类型过滤字段）
 const saveComponent = async () => {
     if (!selectedComponent.value) return;
     saving.value = true;
@@ -162,7 +163,6 @@ const saveComponent = async () => {
             content: {
                 title: editForm.value.title,
                 subtitle: editForm.value.subtitle,
-                text: editForm.value.text,
                 image_url: editForm.value.image_url,
                 link_url: editForm.value.link_url,
             },
@@ -265,7 +265,6 @@ onMounted(async () => {
     height: calc(100vh - 120px);
     gap: 16px;
 }
-
 .editor-sidebar {
     width: 260px;
     background: #fff;
@@ -274,7 +273,6 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
 }
-
 .editor-canvas {
     flex: 1;
     background: #fff;
@@ -283,7 +281,6 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
 }
-
 .editor-property {
     width: 320px;
     background: #fff;
@@ -292,29 +289,23 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
 }
-
-.sidebar-title,
-.canvas-title,
-.property-title {
+.sidebar-title, .canvas-title, .property-title {
     padding: 16px;
     font-weight: bold;
     border-bottom: 1px solid #e8e8e8;
     background: #fafafa;
 }
-
 .canvas-title {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
-
 .component-list {
     padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
-
 .component-item {
     padding: 12px;
     background: #f5f5f5;
@@ -323,19 +314,16 @@ onMounted(async () => {
     text-align: center;
     transition: all 0.2s;
 }
-
 .component-item:hover {
     background: #e6f7ff;
     border-color: #1890ff;
 }
-
 .canvas-content {
     flex: 1;
     padding: 16px;
     overflow-y: auto;
     min-height: 200px;
 }
-
 .canvas-component {
     background: #fafafa;
     border: 1px solid #e8e8e8;
@@ -345,12 +333,10 @@ onMounted(async () => {
     cursor: grab;
     transition: all 0.2s;
 }
-
 .canvas-component.selected {
     border: 2px solid #1890ff;
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    box-shadow: 0 0 0 2px rgba(24,144,255,0.2);
 }
-
 .component-header {
     display: flex;
     justify-content: space-between;
@@ -359,19 +345,16 @@ onMounted(async () => {
     background: #f5f5f5;
     border-bottom: 1px solid #e8e8e8;
 }
-
 .component-preview {
     padding: 20px;
     text-align: center;
     color: #666;
 }
-
 .empty-tip {
     text-align: center;
     color: #999;
     padding: 40px;
 }
-
 .property-content {
     flex: 1;
     padding: 16px;

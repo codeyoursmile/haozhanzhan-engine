@@ -226,12 +226,14 @@ class PageRenderService
     protected function wrapWithLayout(Page $page, string $content): string
     {
         $site = \App\Models\Site::first();
+        $pages = \App\Models\Page::where('status', true)->orderBy('sort_order')->get();
         
         return view('frontend.layouts.app', [
             'title' => $page->title,
             'siteName' => $site->site_name ?? '好站站',
             'siteKeywords' => $site->site_keywords ?? '',
             'siteDescription' => $site->site_description ?? '',
+            'pages' => $pages,
             'content' => $content,
         ])->render();
     }

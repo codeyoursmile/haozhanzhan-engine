@@ -58,6 +58,7 @@ class PageController extends Controller
             'slug' => 'string|max:255|unique:pages,slug,' . $id,
             'is_home' => 'boolean',
             'status' => 'boolean',
+            'sort_order' => 'integer',  // 新增这一行
         ]);
 
         $page->update($validated);

@@ -19,6 +19,18 @@
 
             <el-table :data="pageStore.pages" v-loading="pageStore.loading" stripe>
                 <el-table-column prop="id" label="ID" width="80" />
+                <el-table-column prop="sort_order" label="排序" width="120">
+                    <template #default="{ row }">
+                        <el-input-number 
+                            v-model="row.sort_order" 
+                            size="small" 
+                            :min="0" 
+                            :max="999"
+                            controls-position="right"
+                            @change="(val) => updateSortOrder(row, val)"
+                        />
+                    </template>
+                </el-table-column>
                 <el-table-column prop="title" label="页面标题" />
                 <el-table-column prop="slug" label="访问别名" />
                 <el-table-column prop="is_home" label="是否首页" width="100">
@@ -75,6 +87,9 @@
                         inactive-text="草稿"
                     />
                 </el-form-item>
+                <el-form-item label="排序" prop="sort_order">
+                    <el-input-number v-model="form.sort_order" :min="0" :max="999" />
+                </el-form-item>
             </el-form>
             <template #footer>
                 <el-button @click="dialogVisible = false">取消</el-button>
@@ -109,6 +124,7 @@ const form = reactive({
     slug: '',
     is_home: false,
     status: false,
+    sort_order: 0,
 });
 
 const rules = {
@@ -137,6 +153,17 @@ const handleDelete = (row: any) => {
         await pageStore.deletePage(row.id);
         await pageStore.fetchPages();
     }).catch(() => {});
+};
+
+const updateSortOrder = async (row: any, val: number) => {
+    try {
+        await axios.put(`/api/admin/pages/${row.id}`, { sort_order: val });
+        await pageStore.fetchPages();
+        ElMessage.success('排序已更新');
+    } catch (error) {
+        ElMessage.error('更新失败');
+        await pageStore.fetchPages();
+    }
 };
 
 const handleSubmit = async () => {
@@ -170,6 +197,7 @@ const resetForm = () => {
     form.slug = '';
     form.is_home = false;
     form.status = false;
+    form.sort_order = 0;
 };
 
 const handlePublish = async () => {

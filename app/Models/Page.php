@@ -15,6 +15,7 @@ class Page extends Model
         'slug',
         'is_home',
         'status',
+        'sort_order',   // 添加这一行
     ];
 
     protected $casts = [

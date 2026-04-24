@@ -25,8 +25,17 @@ class PageController extends Controller
             $page = Page::first();
         }
         
+        $pages = Page::where('status', true)->orderBy('sort_order')->get();
         $html = $this->renderService->render($page);
-        return response($html);
+        
+        return view('frontend.layouts.app', [
+            'title' => $page->title,
+            'siteName' => $this->getSiteName(),
+            'siteKeywords' => $this->getSiteKeywords(),
+            'siteDescription' => $this->getSiteDescription(),
+            'pages' => $pages,
+            'content' => $html,
+        ]);
     }
     
     /**
@@ -35,7 +44,34 @@ class PageController extends Controller
     public function show($slug)
     {
         $page = Page::where('slug', $slug)->firstOrFail();
+        $pages = Page::where('status', true)->orderBy('sort_order')->get();
         $html = $this->renderService->render($page);
-        return response($html);
+        
+        return view('frontend.layouts.app', [
+            'title' => $page->title,
+            'siteName' => $this->getSiteName(),
+            'siteKeywords' => $this->getSiteKeywords(),
+            'siteDescription' => $this->getSiteDescription(),
+            'pages' => $pages,
+            'content' => $html,
+        ]);
+    }
+    
+    protected function getSiteName()
+    {
+        $site = \App\Models\Site::first();
+        return $site->site_name ?? '好站站';
+    }
+    
+    protected function getSiteKeywords()
+    {
+        $site = \App\Models\Site::first();
+        return $site->site_keywords ?? '';
+    }
+    
+    protected function getSiteDescription()
+    {
+        $site = \App\Models\Site::first();
+        return $site->site_description ?? '';
     }
 }
