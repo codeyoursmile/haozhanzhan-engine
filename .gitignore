@@ -6,7 +6,6 @@
 /storage/*.key
 /storage/install.lock
 /storage/pail
-/vendor
 .env
 .env.backup
 .env.production
@@ -22,8 +21,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-"public/*.html" 
-"public/*.html" 
-"public/*.html" 
-"public/*.html" 
-"public/*.html" 
+
+# 忽略静态生成的 HTML 文件
+/public/*.html
