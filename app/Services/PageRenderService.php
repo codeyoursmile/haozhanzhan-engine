@@ -10,6 +10,7 @@ class PageRenderService
     /**
      * 渲染整个页面为 HTML
      */
+    
     public function render(Page $page): string
     {
         $components = $page->components()->orderBy('sort_order')->get();
@@ -19,7 +20,10 @@ class PageRenderService
             $html .= $this->renderComponent($component);
         }
         
-        return $this->wrapWithLayout($page, $html);
+        // 注释掉这个，不要包裹布局
+        // return $this->wrapWithLayout($page, $html);
+        
+        return $html;
     }
     
     /**
