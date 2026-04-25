@@ -23,6 +23,19 @@ class PageRenderService
     }
     
     /**
+     * 获取渲染方法名
+     */
+    protected function getRenderMethod(string $type): string
+    {
+        $map = [
+            'contact_form' => 'renderContactForm',
+            'multi_col' => 'renderMultiCol',
+        ];
+        
+        return $map[$type] ?? 'render' . ucfirst($type);
+    }
+    
+    /**
      * 渲染单个组件
      */
     protected function renderComponent(PageComponent $component): string
@@ -30,7 +43,7 @@ class PageRenderService
         $content = $component->content ?? [];
         $settings = $component->settings ?? [];
         
-        $method = 'render' . ucfirst($component->component_type);
+        $method = $this->getRenderMethod($component->component_type);
         if (method_exists($this, $method)) {
             return $this->$method($content, $settings);
         }
@@ -114,8 +127,6 @@ class PageRenderService
             return '';
         }
         
-        $width = floor(12 / $columnCount);
-        
         $html = '<div class="multi-col" style="padding: 60px 0;">';
         $html .= '<div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 20px;">';
         $html .= '<div class="row" style="display: flex; flex-wrap: wrap; gap: 30px;">';
@@ -140,13 +151,11 @@ class PageRenderService
     }
 
     /**
-    * 渲染地图组件
-    */
+     * 渲染地图组件
+     */
     protected function renderMap(array $content, array $settings): string
     {
         $address = $content['address'] ?? '';
-        $latitude = $content['latitude'] ?? '39.9042';
-        $longitude = $content['longitude'] ?? '116.4074';
         $title = $content['title'] ?? '地图';
         
         $html = '<div class="map-block" style="padding: 40px 0;">';
@@ -212,6 +221,7 @@ class PageRenderService
         
         return $html;
     }
+    
     /**
      * 默认渲染（未实现的组件类型）
      */
