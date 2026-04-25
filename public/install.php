@@ -1,7 +1,6 @@
 <?php
 /**
  * 好站站企业建站引擎 - 一键安装向导
- * 纯 PHP 实现，不依赖 exec()，跨平台兼容
  */
 
 error_reporting(E_ALL);
@@ -11,13 +10,11 @@ define('ROOT_PATH', dirname(__DIR__));
 define('ENV_PATH', ROOT_PATH . '/.env');
 define('LOCK_FILE', ROOT_PATH . '/storage/install.lock');
 
-// 如果已安装，跳转首页
 if (file_exists(LOCK_FILE)) {
     header('Location: /');
     exit;
 }
 
-// 处理安装提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = [];
 
@@ -36,7 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!filter_var($admin_email, FILTER_VALIDATE_EMAIL)) $errors[] = '管理员邮箱格式不正确';
     if (strlen($admin_pass) < 6) $errors[] = '管理员密码至少6位';
 
-    // 测试数据库连接
     if (empty($errors)) {
         try {
             $pdo = new PDO("mysql:host=$db_host;port=$db_port;charset=utf8mb4", $db_user, $db_pass);
@@ -49,16 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // 生成 APP_KEY
         $appKey = 'base64:' . base64_encode(random_bytes(32));
+        $appUrl = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
 
-        // 写入 .env 文件
         $envContent = '';
         $envContent .= 'APP_NAME="好站站企业建站引擎"' . "\n";
         $envContent .= 'APP_ENV=production' . "\n";
         $envContent .= 'APP_KEY=' . $appKey . "\n";
         $envContent .= 'APP_DEBUG=false' . "\n";
-        $envContent .= 'APP_URL=http://' . $_SERVER['HTTP_HOST'] . "\n";
+        $envContent .= 'APP_URL=http://' . $appUrl . "\n";
         $envContent .= "\n";
         $envContent .= 'DB_CONNECTION=mysql' . "\n";
         $envContent .= 'DB_HOST=' . $db_host . "\n";
@@ -73,157 +68,130 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         file_put_contents(ENV_PATH, $envContent);
 
-        // 执行数据库迁移（纯 SQL，不依赖 exec）
-        $migrationFiles = glob(ROOT_PATH . '/database/migrations/*.php');
-        $migrateSuccess = true;
+        // ========== 1. 创建 sites 表并插入数据 ==========
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `sites` (
+            `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `site_name` varchar(255) NOT NULL DEFAULT '好站站企业官网',
+            `site_logo` varchar(500) DEFAULT '/logo.png',
+            `site_keywords` varchar(500) DEFAULT '企业建站,可视化建站,拖拽建站,好站站',
+            `site_description` text,
+            `created_at` timestamp NULL,
+            `updated_at` timestamp NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        foreach ($migrationFiles as $file) {
-            $content = file_get_contents($file);
-            
-            // 解析表名
-            preg_match('/Schema::create\([\'"]([^\'"]+)[\'"]/', $content, $matches);
-            if (!isset($matches[1])) {
-                continue;
-            }
-            $table = $matches[1];
-            
-            // 检查表是否已存在
-            $result = $pdo->query("SHOW TABLES LIKE '$table'");
-            if ($result->rowCount() > 0) {
-                continue; // 表已存在，跳过
-            }
-            
-            // 根据表名生成 SQL
-            $sql = $pdo->prepare("SELECT 1");
-            try {
-                if ($table === 'sites') {
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS `sites` (
-                        `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                        `site_name` varchar(255) NOT NULL DEFAULT '好站站企业官网',
-                        `site_logo` varchar(500) DEFAULT '/logo.png',
-                        `site_keywords` varchar(500) DEFAULT '企业建站,可视化建站,拖拽建站,好站站',
-                        `site_description` text,
-                        `created_at` timestamp NULL,
-                        `updated_at` timestamp NULL
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-                } elseif ($table === 'pages') {
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS `pages` (
-                        `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                        `site_id` bigint unsigned NOT NULL,
-                        `title` varchar(255) NOT NULL DEFAULT '新页面',
-                        `slug` varchar(255) NOT NULL,
-                        `is_home` tinyint(1) NOT NULL DEFAULT '0',
-                        `status` tinyint(1) NOT NULL DEFAULT '0',
-                        `created_at` timestamp NULL,
-                        `updated_at` timestamp NULL,
-                        FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-                } elseif ($table === 'page_components') {
-                    $pdo->exec("CREATE TABLE IF NOT EXISTS `page_components` (
-                        `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                        `page_id` bigint unsigned NOT NULL,
-                        `component_type` varchar(50) NOT NULL,
-                        `content` json DEFAULT NULL,
-                        `settings` json DEFAULT NULL,
-                        `sort_order` int NOT NULL DEFAULT '0',
-                        `created_at` timestamp NULL,
-                        `updated_at` timestamp NULL,
-                        FOREIGN KEY (`page_id`) REFERENCES `pages`(`id`) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-                }
-            } catch (PDOException $e) {
-                $migrateSuccess = false;
-                $errors[] = "创建表 `$table` 失败：" . $e->getMessage();
-                break;
-            }
+        $stmt = $pdo->query("SELECT COUNT(*) FROM sites");
+        if ($stmt->fetchColumn() == 0) {
+            $pdo->exec("INSERT INTO sites (site_name, site_logo, site_keywords, site_description, created_at, updated_at) 
+                VALUES ('好站站企业官网', '/logo.png', '企业建站,可视化建站,拖拽建站,好站站', '好站站企业建站引擎', NOW(), NOW())");
+        }
+        $siteId = $pdo->lastInsertId();
+        if (!$siteId) {
+            $stmt = $pdo->query("SELECT id FROM sites LIMIT 1");
+            $siteId = $stmt->fetchColumn();
         }
 
-        // 运行 Laravel 默认的迁移（users、sessions 等）
-        if ($migrateSuccess) {
-            try {
-                // 创建 users 表（如果不存在）
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
-                    `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    `name` varchar(255) NOT NULL,
-                    `email` varchar(255) NOT NULL UNIQUE,
-                    `email_verified_at` timestamp NULL,
-                    `password` varchar(255) NOT NULL,
-                    `remember_token` varchar(100) DEFAULT NULL,
-                    `created_at` timestamp NULL,
-                    `updated_at` timestamp NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        // ========== 2. 创建其他表（不加外键） ==========
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `pages` (
+            `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `site_id` bigint unsigned NOT NULL,
+            `title` varchar(255) NOT NULL DEFAULT '新页面',
+            `slug` varchar(255) NOT NULL,
+            `is_home` tinyint(1) NOT NULL DEFAULT '0',
+            `status` tinyint(1) NOT NULL DEFAULT '0',
+            `created_at` timestamp NULL,
+            `updated_at` timestamp NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-                // 创建 password_reset_tokens 表
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
-                    `email` varchar(255) NOT NULL PRIMARY KEY,
-                    `token` varchar(255) NOT NULL,
-                    `created_at` timestamp NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `page_components` (
+            `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `page_id` bigint unsigned NOT NULL,
+            `component_type` varchar(50) NOT NULL,
+            `content` json DEFAULT NULL,
+            `settings` json DEFAULT NULL,
+            `sort_order` int NOT NULL DEFAULT '0',
+            `created_at` timestamp NULL,
+            `updated_at` timestamp NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-                // 创建 sessions 表
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `sessions` (
-                    `id` varchar(255) NOT NULL PRIMARY KEY,
-                    `user_id` bigint unsigned DEFAULT NULL,
-                    `ip_address` varchar(45) DEFAULT NULL,
-                    `user_agent` text,
-                    `payload` longtext NOT NULL,
-                    `last_activity` int NOT NULL,
-                    INDEX `sessions_user_id_index` (`user_id`),
-                    INDEX `sessions_last_activity_index` (`last_activity`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
+            `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `name` varchar(255) NOT NULL,
+            `email` varchar(255) NOT NULL UNIQUE,
+            `email_verified_at` timestamp NULL,
+            `password` varchar(255) NOT NULL,
+            `remember_token` varchar(100) DEFAULT NULL,
+            `created_at` timestamp NULL,
+            `updated_at` timestamp NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-                // 创建 cache 表
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `cache` (
-                    `key` varchar(255) NOT NULL PRIMARY KEY,
-                    `value` mediumtext NOT NULL,
-                    `expiration` int NOT NULL
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
+            `email` varchar(255) NOT NULL PRIMARY KEY,
+            `token` varchar(255) NOT NULL,
+            `created_at` timestamp NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-                // 创建 jobs 表
-                $pdo->exec("CREATE TABLE IF NOT EXISTS `jobs` (
-                    `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    `queue` varchar(255) NOT NULL,
-                    `payload` longtext NOT NULL,
-                    `attempts` tinyint unsigned NOT NULL,
-                    `reserved_at` int unsigned DEFAULT NULL,
-                    `available_at` int unsigned NOT NULL,
-                    `created_at` int unsigned NOT NULL,
-                    INDEX `jobs_queue_index` (`queue`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-            } catch (PDOException $e) {
-                $migrateSuccess = false;
-                $errors[] = '创建系统表失败：' . $e->getMessage();
-            }
-        }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `sessions` (
+            `id` varchar(255) NOT NULL PRIMARY KEY,
+            `user_id` bigint unsigned DEFAULT NULL,
+            `ip_address` varchar(45) DEFAULT NULL,
+            `user_agent` text,
+            `payload` longtext NOT NULL,
+            `last_activity` int NOT NULL,
+            INDEX `sessions_user_id_index` (`user_id`),
+            INDEX `sessions_last_activity_index` (`last_activity`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        if ($migrateSuccess) {
-            // 创建管理员用户
-            $hashed = password_hash($admin_pass, PASSWORD_BCRYPT);
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `cache` (
+            `key` varchar(255) NOT NULL PRIMARY KEY,
+            `value` mediumtext NOT NULL,
+            `expiration` int NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `jobs` (
+            `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            `queue` varchar(255) NOT NULL,
+            `payload` longtext NOT NULL,
+            `attempts` tinyint unsigned NOT NULL,
+            `reserved_at` int unsigned DEFAULT NULL,
+            `available_at` int unsigned NOT NULL,
+            `created_at` int unsigned NOT NULL,
+            INDEX `jobs_queue_index` (`queue`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // ========== 3. 添加外键 ==========
+        try {
+            $pdo->exec("ALTER TABLE `pages` ADD CONSTRAINT `pages_ibfk_1` FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE CASCADE");
+        } catch (PDOException $e) {}
+        try {
+            $pdo->exec("ALTER TABLE `page_components` ADD CONSTRAINT `page_components_ibfk_1` FOREIGN KEY (`page_id`) REFERENCES `pages`(`id`) ON DELETE CASCADE");
+        } catch (PDOException $e) {}
+
+        // ========== 4. 创建默认页面 ==========
+        $stmt = $pdo->prepare("INSERT INTO pages (site_id, title, slug, is_home, status, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+        $stmt->execute([$siteId, '首页', 'index', 1, 1]);
+        $stmt->execute([$siteId, '关于我们', 'about', 0, 1]);
+
+        // ========== 5. 创建管理员 ==========
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+        $stmt->execute([$admin_email]);
+        $hashed = password_hash($admin_pass, PASSWORD_BCRYPT);
+
+        if ($stmt->fetchColumn() == 0) {
             $stmt = $pdo->prepare("INSERT INTO users (name, email, password, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())");
             $stmt->execute([$admin_name, $admin_email, $hashed]);
-
-            // 获取 site_id（刚创建的第一个站点）
-            $siteId = 1;
-
-            // 创建默认页面
-            $stmt = $pdo->prepare("INSERT INTO pages (site_id, title, slug, is_home, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
-            $stmt->execute([$siteId, '首页', 'index', 1, 1]);
-            $stmt->execute([$siteId, '关于我们', 'about', 0, 1]);
-
-            // 生成安装锁文件
-            file_put_contents(LOCK_FILE, date('Y-m-d H:i:s'));
-
-            // 安装完成，跳转首页
-            header('Location: /');
-            exit;
+        } else {
+            $stmt = $pdo->prepare("UPDATE users SET name = ?, password = ?, updated_at = NOW() WHERE email = ?");
+            $stmt->execute([$admin_name, $hashed, $admin_email]);
         }
+
+        file_put_contents(LOCK_FILE, date('Y-m-d H:i:s'));
+        header('Location: /');
+        exit;
     }
 
     if (!empty($errors)) {
-        // 安装失败，删除 .env 回滚
-        if (file_exists(ENV_PATH)) {
-            unlink(ENV_PATH);
-        }
+        if (file_exists(ENV_PATH)) unlink(ENV_PATH);
         $errorMsg = implode('<br>', $errors);
         echo "<script>alert('安装失败：\\n$errorMsg'); window.history.back();</script>";
         exit;
@@ -238,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>好站站企业建站引擎 - 一键安装</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+        body { background: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .container { max-width: 600px; margin: 50px auto; padding: 20px; }
         .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); overflow: hidden; }
         .header { background: #3b82f6; color: #fff; padding: 30px; text-align: center; }
