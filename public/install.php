@@ -10,11 +10,62 @@ define('ROOT_PATH', dirname(__DIR__));
 define('ENV_PATH', ROOT_PATH . '/.env');
 define('LOCK_FILE', ROOT_PATH . '/storage/install.lock');
 
+// 如果已安装，跳转首页
 if (file_exists(LOCK_FILE)) {
     header('Location: /');
     exit;
 }
 
+// ========== 环境监测 ==========
+$envErrors = [];
+
+// PHP 版本检测
+if (version_compare(PHP_VERSION, '8.2.0', '<')) {
+    $envErrors[] = 'PHP 版本需要 >= 8.2，当前版本：' . PHP_VERSION;
+}
+
+// 必需扩展检测
+$requiredExtensions = ['pdo', 'pdo_mysql', 'openssl', 'json', 'fileinfo', 'mbstring', 'tokenizer'];
+foreach ($requiredExtensions as $ext) {
+    if (!extension_loaded($ext)) {
+        $envErrors[] = 'PHP 扩展未启用：' . $ext;
+    }
+}
+
+// 目录权限检测
+$writablePaths = [
+    ROOT_PATH . '/storage',
+    ROOT_PATH . '/storage/logs',
+    ROOT_PATH . '/storage/framework',
+    ROOT_PATH . '/bootstrap/cache',
+];
+foreach ($writablePaths as $path) {
+    if (!is_writable($path)) {
+        $envErrors[] = '目录不可写：' . $path;
+    }
+}
+
+// .env 写入权限（项目根目录）
+if (!is_writable(ROOT_PATH)) {
+    $envErrors[] = '项目根目录不可写（无法创建 .env 文件）';
+}
+
+// 如果有环境错误，显示错误页面并终止
+if (!empty($envErrors)) {
+    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>环境检测失败</title><style>';
+    echo 'body{font-family:sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;height:100vh;}';
+    echo '.card{background:#fff;border-radius:12px;padding:30px;max-width:600px;box-shadow:0 2px 12px rgba(0,0,0,0.1);}';
+    echo 'h1{color:#e74c3c;margin-bottom:20px;}ul{color:#666;line-height:1.8;}li{margin:10px 0;}</style></head><body>';
+    echo '<div class="card"><h1>⚠️ 环境检测失败</h1><p>您的服务器环境不满足安装要求：</p><ul>';
+    foreach ($envErrors as $error) {
+        echo '<li>' . htmlspecialchars($error) . '</li>';
+    }
+    echo '</ul><p>请解决以上问题后刷新页面重新安装。</p></div></body></html>';
+    exit;
+}
+// ========== 环境监测结束 ==========
+
+// 处理安装提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $errors = [];
 
@@ -33,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!filter_var($admin_email, FILTER_VALIDATE_EMAIL)) $errors[] = '管理员邮箱格式不正确';
     if (strlen($admin_pass) < 6) $errors[] = '管理员密码至少6位';
 
+    // 测试数据库连接
     if (empty($errors)) {
         try {
             $pdo = new PDO("mysql:host=$db_host;port=$db_port;charset=utf8mb4", $db_user, $db_pass);
@@ -68,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         file_put_contents(ENV_PATH, $envContent);
 
-        // ========== 1. 创建 sites 表并插入数据 ==========
+        // ========== 创建表 ==========
         $pdo->exec("CREATE TABLE IF NOT EXISTS `sites` (
             `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `site_name` varchar(255) NOT NULL DEFAULT '好站站企业官网',
@@ -79,18 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             `updated_at` timestamp NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        $stmt = $pdo->query("SELECT COUNT(*) FROM sites");
-        if ($stmt->fetchColumn() == 0) {
-            $pdo->exec("INSERT INTO sites (site_name, site_logo, site_keywords, site_description, created_at, updated_at) 
-                VALUES ('好站站企业官网', '/logo.png', '企业建站,可视化建站,拖拽建站,好站站', '好站站企业建站引擎', NOW(), NOW())");
-        }
-        $siteId = $pdo->lastInsertId();
-        if (!$siteId) {
-            $stmt = $pdo->query("SELECT id FROM sites LIMIT 1");
-            $siteId = $stmt->fetchColumn();
-        }
-
-        // ========== 2. 创建其他表（不加外键） ==========
         $pdo->exec("CREATE TABLE IF NOT EXISTS `pages` (
             `id` bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
             `site_id` bigint unsigned NOT NULL,
@@ -98,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             `slug` varchar(255) NOT NULL,
             `is_home` tinyint(1) NOT NULL DEFAULT '0',
             `status` tinyint(1) NOT NULL DEFAULT '0',
+            `sort_order` int NOT NULL DEFAULT '0',
             `created_at` timestamp NULL,
             `updated_at` timestamp NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -158,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             INDEX `jobs_queue_index` (`queue`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        // ========== 3. 添加外键 ==========
+        // ========== 添加外键 ==========
         try {
             $pdo->exec("ALTER TABLE `pages` ADD CONSTRAINT `pages_ibfk_1` FOREIGN KEY (`site_id`) REFERENCES `sites`(`id`) ON DELETE CASCADE");
         } catch (PDOException $e) {}
@@ -166,13 +207,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->exec("ALTER TABLE `page_components` ADD CONSTRAINT `page_components_ibfk_1` FOREIGN KEY (`page_id`) REFERENCES `pages`(`id`) ON DELETE CASCADE");
         } catch (PDOException $e) {}
 
-        // ========== 4. 创建默认页面 ==========
-        $stmt = $pdo->prepare("INSERT INTO pages (site_id, title, slug, is_home, status, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+        // ========== 插入站点数据 ==========
+        $stmt = $pdo->query("SELECT COUNT(*) FROM sites");
+        if ($stmt->fetchColumn() == 0) {
+            $pdo->exec("INSERT INTO sites (site_name, site_logo, site_keywords, site_description, created_at, updated_at) 
+                VALUES ('好站站企业官网', '/logo.png', '企业建站,可视化建站,拖拽建站,好站站', '好站站企业建站引擎', NOW(), NOW())");
+        }
+        $siteId = $pdo->lastInsertId() ?: 1;
+
+        // ========== 创建默认页面 ==========
+        $stmt = $pdo->prepare("INSERT INTO pages (site_id, title, slug, is_home, status, sort_order, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, 0, NOW(), NOW())");
         $stmt->execute([$siteId, '首页', 'index', 1, 1]);
         $stmt->execute([$siteId, '关于我们', 'about', 0, 1]);
 
-        // ========== 5. 创建管理员 ==========
+        // ========== 创建管理员 ==========
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
         $stmt->execute([$admin_email]);
         $hashed = password_hash($admin_pass, PASSWORD_BCRYPT);
