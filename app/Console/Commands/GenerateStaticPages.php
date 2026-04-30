@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Page;
+use App\Models\Site;
 use App\Services\PageRenderService;
 use Illuminate\Console\Command;
 
@@ -30,10 +31,24 @@ class GenerateStaticPages extends Command
             return 0;
         }
 
+        $site = Site::first();
+        $allPages = Page::where('status', true)->orderBy('sort_order')->get();
+
         $generated = 0;
 
         foreach ($pages as $page) {
-            $html = $this->renderService->render($page);
+            // 只获取组件内容
+            $content = $this->renderService->render($page);
+            
+            // 手动包裹 layout
+            $html = view('frontend.layouts.app', [
+                'title' => $page->title,
+                'siteName' => $site->site_name ?? '好站站',
+                'siteKeywords' => $site->site_keywords ?? '',
+                'siteDescription' => $site->site_description ?? '',
+                'pages' => $allPages,
+                'content' => $content,
+            ])->render();
 
             if ($page->is_home) {
                 $filename = 'index.html';
