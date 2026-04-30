@@ -40,7 +40,7 @@
                 >
                     <div class="component-header">
                         <span>{{ getComponentName(comp.component_type) }}</span>
-                        <el-button type="danger" link size="small" @click.stop="componentStore.deleteComponent(comp.id)">
+                        <el-button type="danger" link size="small" @click.stop="handleDeleteComponent(comp)">
                             删除
                         </el-button>
                     </div>
@@ -122,9 +122,24 @@ const editForm = ref({
     text: '',
     image_url: '',
     link_url: '',
+    columns: [] as any[],
 });
 const saving = ref(false);
 const savingPage = ref(false);
+const columnCount = ref(3);
+
+// 初始化列数据
+const initColumns = () => {
+    const cols = [];
+    for (let i = 0; i < columnCount.value; i++) {
+        cols.push({ image_url: '', title: '', content: '' });
+    }
+    editForm.value.columns = cols;
+};
+
+const resizeColumns = () => {
+    initColumns();
+};
 
 // 选中组件
 const selectComponent = (comp: any) => {
@@ -132,16 +147,65 @@ const selectComponent = (comp: any) => {
     selectedId.value = comp.id;
 };
 
+// 删除组件（并清空选中状态）
+const handleDeleteComponent = async (comp: any) => {
+    try {
+        await componentStore.deleteComponent(comp.id);
+        // 如果删除的是当前选中的组件，清空选中状态
+        if (selectedId.value === comp.id) {
+            selectedComponent.value = null;
+            selectedId.value = null;
+        }
+    } catch (error) {
+        // 错误已在 store 中处理
+    }
+};
+
 // 监听选中组件变化，自动填充表单
 watch(selectedComponent, (newVal) => {
     if (newVal && newVal.content) {
-        editForm.value = {
-            title: newVal.content.title || '',
-            subtitle: newVal.content.subtitle || '',
-            text: newVal.content.text || '',
-            image_url: newVal.content.image_url || '',
-            link_url: newVal.content.link_url || '',
-        };
+        const type = newVal.component_type;
+        const content = newVal.content;
+        
+        if (type === 'multi_col') {
+            const cols = content.columns || [];
+            columnCount.value = cols.length || 3;
+            editForm.value.columns = cols.length ? [...cols] : [
+                { image_url: '', title: '列1', content: '内容1' },
+                { image_url: '', title: '列2', content: '内容2' },
+                { image_url: '', title: '列3', content: '内容3' },
+            ];
+        } else if (type === 'contact_form') {
+            editForm.value.title = content.title || '';
+            editForm.value.subtitle = content.subtitle || '';
+            editForm.value.text = '';
+            editForm.value.image_url = '';
+            editForm.value.link_url = '';
+        } else if (type === 'banner') {
+            editForm.value.title = content.title || '';
+            editForm.value.subtitle = content.subtitle || '';
+            editForm.value.image_url = content.image_url || '';
+            editForm.value.link_url = content.link_url || '';
+            editForm.value.text = '';
+        } else if (type === 'text') {
+            editForm.value.title = content.title || '';
+            editForm.value.text = content.text || '';
+            editForm.value.subtitle = '';
+            editForm.value.image_url = '';
+            editForm.value.link_url = '';
+        } else if (type === 'image') {
+            editForm.value.title = content.title || '';
+            editForm.value.image_url = content.image_url || '';
+            editForm.value.link_url = content.link_url || '';
+            editForm.value.subtitle = '';
+            editForm.value.text = '';
+        } else {
+            editForm.value.title = content.title || '';
+            editForm.value.subtitle = '';
+            editForm.value.text = '';
+            editForm.value.image_url = '';
+            editForm.value.link_url = '';
+        }
     } else {
         // 重置表单
         editForm.value = {
@@ -150,7 +214,9 @@ watch(selectedComponent, (newVal) => {
             text: '',
             image_url: '',
             link_url: '',
+            columns: [],
         };
+        columnCount.value = 3;
     }
 }, { immediate: true });
 
@@ -159,15 +225,42 @@ const saveComponent = async () => {
     if (!selectedComponent.value) return;
     saving.value = true;
     try {
-        await componentStore.updateComponent(selectedComponent.value.id, {
-            content: {
+        let contentData: any = {};
+        const type = selectedComponent.value.component_type;
+        
+        if (type === 'multi_col') {
+            contentData = { columns: editForm.value.columns };
+        } else if (type === 'contact_form') {
+            contentData = {
+                title: editForm.value.title,
+                subtitle: editForm.value.subtitle,
+            };
+        } else if (type === 'banner') {
+            contentData = {
                 title: editForm.value.title,
                 subtitle: editForm.value.subtitle,
                 image_url: editForm.value.image_url,
                 link_url: editForm.value.link_url,
-            },
+            };
+        } else if (type === 'text') {
+            contentData = {
+                title: editForm.value.title,
+                text: editForm.value.text,
+            };
+        } else if (type === 'image') {
+            contentData = {
+                title: editForm.value.title,
+                image_url: editForm.value.image_url,
+                link_url: editForm.value.link_url,
+            };
+        } else {
+            contentData = { title: editForm.value.title };
+        }
+        
+        await componentStore.updateComponent(selectedComponent.value.id, {
+            content: contentData,
         });
-        selectedComponent.value.content = { ...editForm.value };
+        selectedComponent.value.content = contentData;
         ElMessage.success('组件保存成功');
     } catch (error) {
         ElMessage.error('组件保存失败');

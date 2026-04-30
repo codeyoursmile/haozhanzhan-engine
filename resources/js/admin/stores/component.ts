@@ -57,13 +57,14 @@ export const useComponentStore = defineStore('component', () => {
         }
     };
 
-    // 删除组件
-    const deleteComponent = async (id: number) => {
+    // 删除组件（返回被删除的组件ID，供调用方清空选中状态）
+    const deleteComponent = async (id: number): Promise<number> => {
         loading.value = true;
         try {
             await componentApi.delete(id);
             components.value = components.value.filter(c => c.id !== id);
             ElMessage.success('删除成功');
+            return id;  // 返回被删除的组件ID
         } catch (error) {
             ElMessage.error('删除失败');
             throw error;
