@@ -6,10 +6,26 @@ services:
     volumes:
       - .:/var/www/html
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
   php:
     build: .
+    volumes:
+      - .:/var/www/html
+
   mysql:
     image: docker.1panel.live/library/mysql:8.0
+    container_name: mysql
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root123
       MYSQL_DATABASE: haozhanzhan
+      MYSQL_ROOT_PASSWORD: 123456   # ⚠️ 请在生产环境修改为强密码
+      # 数据库用户名固定为 root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql   # 关键：数据持久化
+
+volumes:
+  mysql_data:
