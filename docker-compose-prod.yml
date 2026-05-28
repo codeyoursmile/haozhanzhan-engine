@@ -5,7 +5,7 @@ services:
       - "8088:80"
     volumes:
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf
-      - ./share:/var/www/html
+      - code:/var/www/html
     depends_on:
       - php
     networks:
@@ -15,7 +15,7 @@ services:
   php:
     image: codeyoursmile/haozhanzhan:latest
     volumes:
-      - ./share:/var/www/html
+      - code:/var/www/html
     networks:
       - app-network
     restart: unless-stopped
@@ -39,4 +39,5 @@ networks:
     driver: bridge
 
 volumes:
+  code:
   mysql_data:
