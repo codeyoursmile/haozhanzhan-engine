@@ -15,6 +15,10 @@ if (file_exists(LOCK_FILE)) {
     exit;
 }
 
+// 检测是否在 Docker 容器内
+$isDocker = file_exists('/.dockerenv');
+$defaultDbHost = $isDocker ? 'mysql' : '127.0.0.1';
+
 // ========== 环境监测 ==========
 $envErrors = [];
 
@@ -90,6 +94,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         $appKey = 'base64:' . base64_encode(random_bytes(32));
+        
+        // 自动识别 HTTPS 协议
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $appUrl = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
 
         $envContent = '';
@@ -97,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $envContent .= 'APP_ENV=production' . "\n";
         $envContent .= 'APP_KEY=' . $appKey . "\n";
         $envContent .= 'APP_DEBUG=false' . "\n";
-        $envContent .= 'APP_URL=http://' . $appUrl . "\n";
+        $envContent .= 'APP_URL=' . $protocol . '://' . $appUrl . "\n";
         $envContent .= "\n";
         $envContent .= 'DB_CONNECTION=mysql' . "\n";
         $envContent .= 'DB_HOST=' . $db_host . "\n";
@@ -292,7 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="row">
                     <div class="form-group">
                         <label>数据库主机</label>
-                        <input type="text" name="db_host" value="127.0.0.1" required>
+                        <input type="text" name="db_host" value="<?php echo $defaultDbHost; ?>" required>
                     </div>
                     <div class="form-group">
                         <label>端口</label>
