@@ -15,8 +15,12 @@ if (file_exists(LOCK_FILE)) {
     exit;
 }
 
-// 检测是否在 Docker 容器内
-$isDocker = file_exists('/.dockerenv');
+// 检测是否在 Docker 容器内（使用 @ 抑制 open_basedir 警告）
+$isDocker = false;
+$dockerCheck = @file_exists('/.dockerenv');
+if ($dockerCheck === true) {
+    $isDocker = true;
+}
 $defaultDbHost = $isDocker ? 'mysql' : '127.0.0.1';
 
 // ========== 环境监测 ==========
